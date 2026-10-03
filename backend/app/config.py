@@ -22,6 +22,9 @@ class Settings(BaseSettings):
         description='Path to the saved FAISS vector index file'   
     )
 
+    # postgres/Supabase connection string
+    database_url:str = Field(..., description='Postgres/Supabase connection string')
+
     class Config:
         # Pydantic ko batata hai ke values ".env" naam ki file se uthani hain
         env_file='.env'

@@ -24,12 +24,18 @@ def call_llm(messages:list, tools:list |None = None):
     kahin bhi change na karna pare.
     """
 
-    response = _client.chat.completions.create(
-        model = settings.groq_model,
-        messages = messages,
-        tools = tools,
-        tool_choice = 'auto' if tools else 'None',
-        max_tokens = 1024
-    )
+    kwargs = {
+        "model": settings.groq_model,            # .env se aaya model naam
+        "messages": messages,                     # Conversation history
+        "max_tokens": 1024,                       # Response ki max length
+    }
+
+
+    if tools:                                       # Sirf agar tools di gayi hon
+        kwargs["tools"] = tools                       # Tools list add karo
+        kwargs["tool_choice"] = "auto" 
+    # Groq ka chat completion call - ye OpenAI ke format se compatible hai
+    response = _client.chat.completions.create(**kwargs)
+
 
     return response
