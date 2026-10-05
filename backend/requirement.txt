@@ -3,6 +3,7 @@ httpx==0.27.0               # Async HTTP client - Groq aur FastAPI
 sqlalchemy==2.0.35          # ORM - Python objects ko Postgres tables se map karta hai
 psycopg2-binary==2.9.9      # Postgres database driver (Supabase Postgres se connect karne ke liye)
 langgraph==0.2.45           # Agent orchestration - state machine ke through multi-step flow banata hai
+docker==7.1.0               # Docker SDK - containers ka status check karna, logs padhna
 faiss-cpu==1.8.0.post1      # FAISS (CPU version) - vector similarity search
 numpy==1.26.4               # Numeric arrays - FAISS aur embeddings ke liye zaroori
 python-dotenv==1.0.1        # .env file read karne ke liye
