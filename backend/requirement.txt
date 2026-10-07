@@ -4,8 +4,9 @@ sqlalchemy==2.0.35          # ORM - Python objects ko Postgres tables se map kar
 psycopg2-binary==2.9.9      # Postgres database driver (Supabase Postgres se connect karne ke liye)
 langgraph==0.2.45           # Agent orchestration - state machine ke through multi-step flow banata hai
 docker==7.1.0               # Docker SDK - containers ka status check karna, logs padhna
+mcp>=2.0.0,<3.0.0           # Model Context Protocol v2 SDK (28 July 2026 ko release hui, FastMCP -> MCPServer renamed)
 faiss-cpu==1.8.0.post1      # FAISS (CPU version) - vector similarity search
 numpy==1.26.4               # Numeric arrays - FAISS aur embeddings ke liye zaroori
 python-dotenv==1.0.1        # .env file read karne ke liye
-pydantic==2.9.2             # Data validation aur settings management
+pydantic==2.13.5            # Data validation aur settings management
 pydantic-settings==2.5.2    # BaseSettings class jo config.py me use hui
