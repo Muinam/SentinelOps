@@ -29,3 +29,14 @@ def get_recent_incidents(db: Session, limit: int=5) -> list[Incident]:
         .limit(limit)                                         # Sirf "limit" tak records lo
         .all()                                                  # Query chalao, sab results list me lo
     )
+
+def get_all_incidents(db:Session) -> list[Incident]:
+    """
+    Day 6 NAYA: Postgres ke SAARE incidents (purane se naye order me) nikalta hai.
+    RAG backfill ke liye use hota hai - Postgres ki history ko FAISS memory me daalne ke liye.
+    """
+    return (
+        db.query(Incident)
+        .order_by(Incident.created_at.asc())
+        .all()
+    )

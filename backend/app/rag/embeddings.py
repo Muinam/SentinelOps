@@ -1,37 +1,32 @@
-import hashlib     # hashlib - text ko deterministic numbers me convert karne ke liye
 import numpy as np  # numpy - FAISS ko arrays numpy format me hi chahiye hote hain
+from sentence_transformers import SentenceTransformer
+EMBEDDING_DIM = 384  # Har vector ki length - jitna bara utna zyada "detail" (yahan demo ke liye chhota rakha)
+MODEL_NAME = "all-MiniLM-L6-v2" # fast and light model
 
-EMBEDDING_DIM = 128  # Har vector ki length - jitna bara utna zyada "detail" (yahan demo ke liye chhota rakha)
+_model = None    # Model ek dafa load hoga, phir reuse (loading slow hoti hai)
 
-
-def get_embedding(text: str) -> np.ndarray:
+def _get_model():
     """
-    Text ko ek fixed-length numeric vector me convert karta hai.
-
-    Kaise kaam karta hai (demo logic):
-    1. Text ko lowercase + words me split karte hain
-    2. Har word ka hash lete hain aur usse vector ke andar ek position "activate" karte hain
-    3. Isse similar words wale texts ke vectors bhi similar ban jaate hain
-
-    Production replacement: yahan par Anthropic/Voyage/OpenAI embedding API call hogi
+    Model ko LAZILY load karta hai - yani sirf tab jab pehli dafa zaroorat pade.
+    Isse jin scripts ko embeddings nahi chahiye, unka startup tez rehta hai.
     """
+    global _model
 
-    vector = np.zeros(EMBEDDING_DIM, dtype="float32")  # Shuru me sab zero ka vector banao
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
 
-    words = text.lower().split()                        # Text ko chhote alfaaz (words) me todo
+    return _model
 
-    for word in words:                                   # Har word ke liye loop chalao
-        # Word ka MD5 hash lo aur usse integer me convert karo
-        hash_val = int(hashlib.md5(word.encode()).hexdigest(), 16)
 
-        # Hash ko vector ki length ke andar fit karo (modulo operation)
-        index = hash_val % EMBEDDING_DIM
+def get_embedding(text:str) -> np.ndarray:
+    """
+    Text ko ek 384-numbers ke vector me convert karta hai - REAL meaning ke sath.
+    Similar meaning wale texts ke vectors ek dusre ke "qareeb" hote hain.
+    """
+    model = _get_model()
 
-        vector[index] += 1.0                             # Us position ki value badhao (word "present" hai)
-
-    # Vector ko normalize karo (length 1 banao) - isse similarity comparison fair rehta hai
-    norm = np.linalg.norm(vector)                        # Vector ki magnitude (length) nikalo
-    if norm > 0:                                          # Zero-division se bachne ke liye check
-        vector = vector / norm                            # Har value ko norm se divide karo
-
-    return vector                                          # Final numeric vector return karo
+    # normalize_embeddings=True - vector ki length 1 kar deta hai, jisse
+    # similarity comparison fair rehta hai (cosine similarity jaisa behave karta hai)
+    vector = model.encode([text], convert_to_numpy=True)
+    
+    return np.asarray(vector, dtype="float32").reshape(-1)

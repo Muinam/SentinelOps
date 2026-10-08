@@ -1,6 +1,14 @@
+from app.db.database import settings
 from app.rag.faiss_store import FaissStore
 
 _store = FaissStore()              # Underscore = "internal use only" convention
+
+
+_loaded = _store.load(settings.faiss_index_path)
+if _loaded:
+    print(f"[RAG] Disk se {_store.index.ntotal} purane incidents load hue")
+else:
+    print("[RAG] Koi saved memory nahi mili - khali index se shuru")
 
 
 def seed_incident_history(incident_texts: list[str]) -> None:
@@ -10,6 +18,20 @@ def seed_incident_history(incident_texts: list[str]) -> None:
     """
     for text in incident_texts:
         _store.add_incident(text)       # FAISS index me add karo
+
+
+def remember_incident(text:str) -> None:
+    """
+    Day 6 NAYA: ek REAL incident ko memory me add karta hai AUR turant disk pe save karta hai.
+    Reporter node incident resolve hone ke baad isko call karta hai - yehi "continuous ingestion" hai.
+    """
+    _store.add_incident(text)                          # Embed + index me add
+    _store.save(settings.faiss_index_path)              # Disk pe save - restart ke baad bhi yaad rahe
+
+
+def memory_size() -> int:
+    """Kitne incidents memory me hain - debugging/test ke liye."""
+    return _store.index.ntotal
 
 
 def search_similar_incidents(query: str) -> dict:

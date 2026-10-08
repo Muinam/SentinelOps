@@ -6,6 +6,7 @@ langgraph==0.2.45           # Agent orchestration - state machine ke through mul
 docker==7.1.0               # Docker SDK - containers ka status check karna, logs padhna
 mcp>=2.0.0,<3.0.0           # Model Context Protocol v2 SDK (28 July 2026 ko release hui, FastMCP -> MCPServer renamed)
 faiss-cpu==1.8.0.post1      # FAISS (CPU version) - vector similarity search
+sentence-transformers==3.3.1  # REAL open-source embedding model (HuggingFace, local, free)
 numpy==1.26.4               # Numeric arrays - FAISS aur embeddings ke liye zaroori
 python-dotenv==1.0.1        # .env file read karne ke liye
 pydantic==2.13.5            # Data validation aur settings management

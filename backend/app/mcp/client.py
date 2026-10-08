@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sys
 import os
 from mcp import ClientSession, StdioServerParameters
@@ -45,3 +46,19 @@ def call_mcp_tool(tool_name:str, arguments:dict) -> dict:
     SYNC version - MCP tool ko call karne ka simple interface.
     """
     return asyncio.run(_call_tool_async(tool_name, arguments)) 
+
+
+def call_mcp_tool_json(tool_name: str, arguments: dict) -> dict:
+    """
+    Day 6 NAYA: tool call kar ke result ko seedha PYTHON DICT me unwrap karta hai.
+
+    MCP result ke andar asal data aisa hota hai: result.content[0].text = '{"status": "running", ...}'
+    (JSON string). Hum us string ko json.loads() se dict bana dete hain, taake
+    nodes ko MCP ki internal object structure ka pata hi na chale.
+    """
+    result = call_mcp_tool(tool_name, arguments)             # Raw MCP result
+    try:
+        text = result.content[0].text                          # Pehle content block ka text
+        return json.loads(text)                                  # JSON string -> dict
+    except Exception as e:                                        # Agar structure/JSON expected jaisa na ho
+        return {"error": f"MCP result parse nahi ho saka: {e}"}
