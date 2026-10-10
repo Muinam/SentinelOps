@@ -44,7 +44,7 @@ def search_similar_incidents(query: str) -> dict:
     if not results:
         return {'message': 'No Similar past incident found.'}
     
-    return {'similar_incident': results}
+    return {'similar_incidents': results}
 
 
 # ---- Tool ka SCHEMA (Groq/OpenAI-style format, Day 1 wale format jaisa) ----

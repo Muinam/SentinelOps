@@ -13,10 +13,18 @@ def diagnosis_node(state: AgentState) -> AgentState:
 
     rag_result = search_similar_incidents(state['error_message'])
     
+    retry_note=""
+    if state.get('retry_count',0)>0:
+        retry_note = (
+            f"\nIMPORTANT: Pichli fix koshish FAIL hui. Nateeja: {state.get('execution_result')}. "
+            f"Pichla diagnosis tha: {state.get('diagnosis')}. Dobara soch kar alag/behtar diagnosis dein.\n"
+        )
+
     prompts=f"""
     Error: {state['error_message']}
     System status: {state['system_status']}
     Similar past incidents: {rag_result}
+    {retry_note}
 
     Upar di gayi information ke basis par, is format me jawab do:
     ROOT_CAUSE: <ek line>
@@ -32,7 +40,7 @@ def diagnosis_node(state: AgentState) -> AgentState:
     text = response.choices[0].message.content
     
 
-    # ---- STEP 3: Simple parsing - text se ROOT_CAUSE aur SEVERITY nikalo ----
+    # ---- Simple parsing - text se ROOT_CAUSE aur SEVERITY nikalo ----
     diagnosis = "Unknown"                                  # Default fallback value
     severity = "Medium"                                     # Default fallback value
     
@@ -43,7 +51,7 @@ def diagnosis_node(state: AgentState) -> AgentState:
             severity = line.replace("SEVERITY:", "").strip()
 
     return {
-        'similar_incident': rag_result.get('similar_incidents', []),
+        'similar_incidents': rag_result.get('similar_incidents', []),
         'diagnosis' : diagnosis,
         'severity': severity
     }

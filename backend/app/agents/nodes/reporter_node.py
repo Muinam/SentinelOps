@@ -1,5 +1,6 @@
 from app.agents.state import AgentState
 from app.tools.db_tool import log_incident
+from app.tools.rag_tool import remember_incident
 
 def reporter_node(state: AgentState) -> AgentState:
     """
@@ -15,5 +16,19 @@ def reporter_node(state: AgentState) -> AgentState:
     )
 
     print(f"[REPORTER] Incident logged with ID: {result.get('incident_id')}")
+
+    # ---- 2) FAISS memory me bhi add (agli dafa agent isse seekh sake) ----
+    # Yahan SOLUTION bhi shamil hai - taake agli baar "similar past fixes" me asal fix mile
+    memory_text = (
+        f"{state['error_message']} | Diagnosis: {state['diagnosis']} | Fix: {state.get('solution', '')}"
+    )
+
+    try:
+        remember_incident(memory_text)    
+        print("[REPORTER] Incident FAISS memory me bhi add ho gaya")
+    
+    except Exception as e:
+        # Embedding/FAISS fail ho to bhi poora flow na rukay - Postgres me to save ho chuka hai
+        print(f"[REPORTER] ⚠️ FAISS memory update fail (Postgres save safe hai): {e}")
 
     return {"incident_id": result.get("incident_id")}      # State me incident_id save karo
