@@ -7,7 +7,7 @@ settings = get_settings()
 _client = Groq(api_key=settings.groq_api_key)    # Underscore _client = "internal use only" convention
 
 
-def call_llm(messages:list, tools:list |None = None):
+def call_llm(messages:list, tools:list |None = None, max_tokens: int = 1024):
     """
     Ye function LLM ko call karta hai - abhi Groq (open-source Llama) use ho raha hai.
 
@@ -27,7 +27,7 @@ def call_llm(messages:list, tools:list |None = None):
     kwargs = {
         "model": settings.groq_model,            # .env se aaya model naam
         "messages": messages,                     # Conversation history
-        "max_tokens": 1024,                       # Response ki max length
+        "max_tokens": max_tokens,                 # Response ki max length
     }
 
 

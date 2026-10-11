@@ -1,11 +1,12 @@
 from app.agents.state import AgentState
 
 def rejected_node(state: AgentState) -> AgentState:
-    """
-    Rejection ko record karta hai - abhi sirf print kar raha hai,
-    future me isko bhi Postgres me "status: rejected" ke sath save kar sakte hain.
-    """
+    """Incident ko manual review ke liye mark karta hai aur wajah dikhata hai."""
     print("[NODE] rejected_node running...")
-    print(f"⚠️  Incident NOT auto-resolved - manual review chahiye: {state['error_message']}")
 
-    return {'approved': False}
+    reason = state.get("review_reason") or "Automatic resolution was not possible."   # Wajah ya default
+    print(f"⚠️  Manual review chahiye -> {reason}")
+    print(f"    Container: {state.get('container_name')} | Error: {state.get('error_message')}")
+
+    # LangGraph ko har node se kam az kam ek field ka update chahiye - wajah wapas likh dete hain
+    return {"review_reason": reason}
