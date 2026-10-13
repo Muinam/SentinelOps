@@ -9,26 +9,31 @@ def reporter_node(state: AgentState) -> AgentState:
     """
     print("[NODE] reporter_node running...")
 
-    result = log_incident(                              # Day 2 ka tool function (seedha call kiya)
-        error_message=state["error_message"],
-        diagnosis=state["diagnosis"],
-        severity=state["severity"],
-    )
+    incident_id = state.get("incident_id")                    # Intake ne jo ID di thi
 
-    print(f"[REPORTER] Incident logged with ID: {result.get('incident_id')}")
+    # ---- Fallback: DB intake ke waqt fail hua tha ----
+    if incident_id is None:
+        try:
+            result = log_incident(                             # Purane tareeqe se ek row banane ki koshish
+                error_message=state["error_message"],
+                diagnosis=state["diagnosis"],
+                severity=state["severity"],
+            )
+            incident_id = result.get("incident_id")
+            print(f"[REPORTER] fallback se incident #{incident_id} bana")
+        except Exception as error:                              # DB ab bhi kharab
+            print(f"[REPORTER] ⚠️ Postgres me save nahi hua (graph chalta rahega): {error}")
+    else:
+        print(f"[REPORTER] incident #{incident_id} resolved mark hoga")
 
-    # ---- 2) FAISS memory me bhi add (agli dafa agent isse seekh sake) ----
-    # Yahan SOLUTION bhi shamil hai - taake agli baar "similar past fixes" me asal fix mile
+    # ---- FAISS memory me add (solution bhi shamil - agli dafa asli fix mile) ----
     memory_text = (
         f"{state['error_message']} | Diagnosis: {state['diagnosis']} | Fix: {state.get('solution', '')}"
     )
-
     try:
-        remember_incident(memory_text)    
+        remember_incident(memory_text)                          # Embed + index + disk save
         print("[REPORTER] Incident FAISS memory me bhi add ho gaya")
-    
-    except Exception as e:
-        # Embedding/FAISS fail ho to bhi poora flow na rukay - Postgres me to save ho chuka hai
-        print(f"[REPORTER] ⚠️ FAISS memory update fail (Postgres save safe hai): {e}")
+    except Exception as error:
+        print(f"[REPORTER] ⚠️ FAISS memory update fail (Postgres record safe hai): {error}")
 
-    return {"incident_id": result.get("incident_id")}      # State me incident_id save karo
+    return {"incident_id": incident_id}

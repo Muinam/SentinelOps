@@ -1,6 +1,8 @@
 from langgraph.graph import StateGraph, END
 from app.agents.state import AgentState
-from app.core.logging import log_node
+from app.core.logging import log_node                      # Har node ko timing/log ke sath wrap karne ke liye
+from app.core.lifecycle import track                       # Day 8: status aur fields database me likhne wala wrapper
+from app.agents.nodes.intake_node import intake_node 
 from app.agents.nodes.monitor_node import monitor_node
 from app.agents.nodes.diagnosis_node import diagnosis_node
 from app.agents.nodes.critic_node import critic_node
@@ -16,19 +18,20 @@ MAX_RETRIES = 2          # Execution fail hone par pehli koshish ke baad zyada s
 MAX_REFLECTIONS = 1      # Critic diagnosis ko zyada se zyada itni dafa wapas bhej sakta hai
 RECURSION_LIMIT = 60     # LangGraph ki default limit 25 hai; hamare loops me worst case usse upar jata hai
 
-def _route_after_critic(state:AgentState)-> str:
+def _route_after_critic(state: AgentState) -> str:
+    """Critic ke baad: sabit -> solution (ya koi fault nahi to insaan), sabit nahi -> wapas diagnosis ya insaan."""
     if state.get("critic_supported"):                         # Diagnosis evidence se sabit hui
         return "solution_step" if state.get("fault_found") else "rejected_step"   # Fault nahi mila to kuch karna hi nahi
     if state.get("reflection_count", 0) <= MAX_REFLECTIONS:   # Abhi reflection ka mauqa baaki hai
         return "diagnosis_step"                                # Hidayat ke sath dobara diagnose karo
-    return "rejected_step"
+    return "rejected_step"                                     # Mauqe khatam - insaan dekhe
 
 
 def _route_after_solution(state: AgentState) -> str:
     """Solution ke baad: sirf restart wala action approval tak jata hai, baaki insaan ko."""
     if state.get("recommended_action") == "restart_container":
         return "approval_step"
-    return "rejected_step"
+    return "rejected_step"                                     # manual_intervention
 
 
 def _route_after_approval(state: AgentState) -> str:
@@ -58,30 +61,26 @@ def _route_after_verify(state: AgentState) -> str:
 
 
 def build_graph():
-    """
-    Graph banata hai aur COMPILE kar ke return karta hai - compiled graph
-    hi actually "run" (invoke) ho sakta hai.
-
-    Ab poora flow: monitor -> diagnosis -> solution ->  approval -> (BRANCH)
-                                              |-- approved --> reporter -> END
-                                              |-- rejected --> rejected -> END
-    """
-
+    """Graph banata hai aur COMPILE kar ke return karta hai."""
     graph = StateGraph(AgentState)
 
+    # ---- Nodes (har node log_node() se wrap) - naam state field se alag rakhe ("_step" suffix) ----
+    # Har node: log_node (time/log) ke andar track (status + DB sync). Status yahin se dikhta hai.
+    graph.add_node("intake_step", log_node("intake", intake_node))                                   # Incident kholta hai
     graph.add_node("monitor_step", log_node("monitor", monitor_node))
-    graph.add_node("diagnosis_step", log_node("diagnosis", diagnosis_node))
-    graph.add_node("critic_step", log_node("critic", critic_node))
-    graph.add_node("solution_step", log_node("solution", solution_node))
-    graph.add_node("approval_step", log_node("approval", approval_node))
-    graph.add_node("executor_step", log_node("executor", executor_node))
-    graph.add_node("verify_step", log_node("verify", verify_node))
-    graph.add_node("reporter_step", log_node("reporter", reporter_node))
-    graph.add_node("rejected_step", log_node("rejected", rejected_node))
+    graph.add_node("diagnosis_step", log_node("diagnosis", track(diagnosis_node, before="investigating")))
+    graph.add_node("critic_step", log_node("critic", track(critic_node)))
+    graph.add_node("solution_step", log_node("solution", track(solution_node)))
+    graph.add_node("approval_step", log_node("approval", track(approval_node, before="awaiting_approval")))
+    graph.add_node("executor_step", log_node("executor", track(executor_node, before="executing")))
+    graph.add_node("verify_step", log_node("verify", track(verify_node, before="verifying")))
+    graph.add_node("reporter_step", log_node("reporter", track(reporter_node, after="resolved")))
+    graph.add_node("rejected_step", log_node("rejected", track(rejected_node, after="needs_review")))
 
-    graph.set_entry_point("monitor_step")
+    graph.set_entry_point("intake_step")
 
     # ---- Fixed edges ----
+    graph.add_edge("intake_step", "monitor_step")                # Day 8: pehle incident kholo
     graph.add_edge("monitor_step", "diagnosis_step")
     graph.add_edge("diagnosis_step", "critic_step")
 

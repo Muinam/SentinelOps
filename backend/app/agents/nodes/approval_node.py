@@ -1,12 +1,9 @@
 from app.agents.state import AgentState
 
 def approval_node(state: AgentState) -> AgentState:
-    """
-    Diagnosis + solution insaan ko dikhata hai, aur HAAN/NA poochta hai.
-    """
+    """Insaan ko poori information dikhata hai aur HAAN/NA poochta hai."""
     print("[NODE] approval_node running...")
 
-    # ---- Insaan ko poori information dikhao decide karne ke liye ----
     print("\n" + "-" * 60)
     print("HUMAN APPROVAL REQUIRED")
     print("-" * 60)
@@ -20,14 +17,11 @@ def approval_node(state: AgentState) -> AgentState:
     print(f"Why        : {state.get('solution', 'N/A')}")
     print("-" * 60)
 
-    # Terminal se input lo - ye line yahin RUK jaati hai jab tak insaan type na kare
-    answer = input('Is fix ko approve karte hain? (yes/no): ').lower().strip()
-
-    approved = answer in ('yes', 'y', 'haan')
+    answer = input("Is action ko approve karte hain? (yes/no): ").strip().lower()   # Yahin ruk jata hai
+    approved = answer in ("yes", "y", "haan")                          # Flexible matching
 
     if approved:
         print("✅ Approved - executor ko bhejte hain...")
-    else:
-        print("❌ Rejected - fix apply nahi hoga...")
-
-    return {"approved": approved}
+        return {"approved": True}
+    print("❌ Rejected - action nahi hoga...")
+    return {"approved": False, "review_reason": "A human rejected the proposed action."}
