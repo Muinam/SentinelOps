@@ -41,16 +41,22 @@ def get_all_incidents(db:Session) -> list[Incident]:
         .all()
     )
 
-
+# Day 8 NAYA: Incident LIFECYCLE ke functions
 UPDATABLE_FIELDS = {
     "status", "diagnosis", "severity", "solution", "recommended_action", "confidence",
     "retry_count", "review_reason", "resolved_at", "container_name",
+    "evidence", "approval_decision", "approved_by", "approval_note", "decided_at",   # Day 9-11
 }
 
+# Jo statuses "abhi kaam chal raha hai" ka matlab rakhte hain (dedupe aur orphan recovery ke liye)
+ACTIVE_STATUSES = ("detected", "investigating", "awaiting_approval", "executing", "verifying")
+# Jo statuses "kaam khatam" ka matlab rakhte hain
+FINISHED_STATUSES = ("resolved", "needs_review")
 
-def create_open_incident(db: Session, error_message: str, container_name: str) -> Incident:
-    """Naya incident kholta hai (status: investigating). Diagnosis baad me nodes bharenge."""
-    incident = Incident(error_message=error_message, container_name=container_name, status="investigating", retry_count=0)
+
+def create_open_incident(db: Session, error_message: str, container_name: str, status: str = "investigating") -> Incident:
+    """Naya incident kholta hai (default status: investigating; watcher "detected" deta hai). Diagnosis baad me nodes bharenge."""
+    incident = Incident(error_message=error_message, container_name=container_name, status=status, retry_count=0)
     db.add(incident)                                      # Session me daalo
     db.commit()                                            # Permanent save
     db.refresh(incident)                                    # Auto id wapas lo
@@ -98,3 +104,99 @@ def get_events(db: Session, incident_id: int) -> list:
 def count_incidents(db: Session) -> int:
     """Kul incidents ki ginti (tests aur dashboards ke liye)."""
     return db.query(Incident).count()
+
+
+# ======================================================================
+# Day 9-11 NAYA: approval, watcher, policy aur worker ke queries
+# ======================================================================
+from datetime import datetime, timedelta, timezone          # Waqt ke hisab kitab ke liye
+
+
+def as_utc(moment):
+    """Database se aaya waqt (SQLite me naive, Postgres me aware) ko UTC aware banata hai - compare ke liye."""
+    if moment is None:
+        return None
+    if moment.tzinfo is None:                                   # Naive hai (SQLite) to UTC maan lo
+        return moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def list_by_status(db: Session, status: str, limit: int = 50) -> list:
+    """Is status ke incidents, purane pehle (queue ki tarah)."""
+    return (
+        db.query(Incident)
+        .filter(Incident.status == status)
+        .order_by(Incident.id.asc())
+        .limit(limit)
+        .all()
+    )
+
+
+def find_active_incident(db: Session, container_name: str) -> "Incident | None":
+    """Is container ka koi incident jo abhi chal raha hai (dedupe ke liye)."""
+    return (
+        db.query(Incident)
+        .filter(Incident.container_name == container_name, Incident.status.in_(ACTIVE_STATUSES))
+        .order_by(Incident.id.desc())
+        .first()
+    )
+
+
+def in_cooldown(db: Session, container_name: str, cooldown_minutes: int) -> bool:
+    """True agar is container ka aakhri incident cooldown_minutes ke andar khatam hua (flapping se bachne ke liye)."""
+    last = (
+        db.query(Incident)
+        .filter(Incident.container_name == container_name, Incident.status.in_(FINISHED_STATUSES))
+        .order_by(Incident.id.desc())
+        .first()
+    )
+    if last is None or cooldown_minutes <= 0:                      # Koi purana khatam incident nahi / cooldown band
+        return False
+    finished_at = as_utc(last.updated_at or last.created_at)       # Kab khatam hua
+    return datetime.now(timezone.utc) - finished_at < timedelta(minutes=cooldown_minutes)
+
+
+def count_recent_actions(db: Session, container_name: str, hours: int = 1) -> int:
+    """Is container par pichle `hours` ghanton me kitni dafa restart (executing) shuru hua - rate limit ke liye."""
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    return (
+        db.query(IncidentEvent)
+        .join(Incident, Incident.id == IncidentEvent.incident_id)
+        .filter(
+            Incident.container_name == container_name,
+            IncidentEvent.status == "executing",
+            IncidentEvent.created_at >= since,
+        )
+        .count()
+    )
+
+
+def record_decision(db: Session, incident_id: int, approved: bool, by: str, note: "str | None" = None):
+    """
+    Approval ka faisla likhta hai. Return: (ok, message).
+    Sirf tab chalta hai jab incident "awaiting_approval" ho aur abhi tak faisla na hua ho.
+    """
+    incident = db.get(Incident, incident_id)
+    if incident is None:
+        return False, f"Incident #{incident_id} nahi mila."
+    if incident.status != "awaiting_approval":
+        return False, f"Incident #{incident_id} ka status '{incident.status}' hai - approval ka intezar nahi kar raha."
+    if incident.approval_decision is not None:
+        return False, f"Incident #{incident_id} par faisla ho chuka hai ({incident.approval_decision} by {incident.approved_by})."
+    incident.approval_decision = "approved" if approved else "rejected"
+    incident.approved_by = by
+    incident.approval_note = note
+    incident.decided_at = datetime.now(timezone.utc)
+    db.commit()
+    return True, f"Incident #{incident_id}: {incident.approval_decision} by {by}."
+
+
+def list_stale_awaiting(db: Session, older_than_minutes: int) -> list:
+    """awaiting_approval incidents jin par abhi tak faisla nahi hua aur wo itne minute se zyada purane hain."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+    rows = (
+        db.query(Incident)
+        .filter(Incident.status == "awaiting_approval", Incident.approval_decision.is_(None))
+        .all()
+    )
+    return [row for row in rows if as_utc(row.updated_at or row.created_at) < cutoff]

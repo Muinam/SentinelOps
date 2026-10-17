@@ -7,7 +7,8 @@ from app.agents.nodes.monitor_node import monitor_node
 from app.agents.nodes.diagnosis_node import diagnosis_node
 from app.agents.nodes.critic_node import critic_node
 from app.agents.nodes.solution_node import solution_node
-from app.agents.nodes.approval_node import approval_node
+from app.agents.nodes.approval_node import approval_node, external_approval_node
+from app.agents.nodes.policy_node import policy_node 
 from app.agents.nodes.executor_node import executor_node
 from app.agents.nodes.verify_node import verify_node
 from app.agents.nodes.reporter_node import reporter_node
@@ -30,9 +31,19 @@ def _route_after_critic(state: AgentState) -> str:
 def _route_after_solution(state: AgentState) -> str:
     """Solution ke baad: sirf restart wala action approval tak jata hai, baaki insaan ko."""
     if state.get("recommended_action") == "restart_container":
-        return "approval_step"
+        return "policy_step"
     return "rejected_step"                                     # manual_intervention
 
+
+def _route_after_policy(state: AgentState) -> str:
+    """Policy ke baad: blocked -> insaan, auto -> seedha executor, human -> approval ka intezar."""
+    decision = state.get("policy_decision")
+    if decision == "blocked":
+        return "rejected_step"
+    if decision == "auto":
+        return "executor_step"
+    return "approval_step"
+    
 
 def _route_after_approval(state: AgentState) -> str:
     """Insaan ne approve kiya to executor, warna rejected."""
@@ -60,9 +71,15 @@ def _route_after_verify(state: AgentState) -> str:
     return _retry_or_reject(state)
 
 
-def build_graph():
-    """Graph banata hai aur COMPILE kar ke return karta hai."""
+def build_graph(checkpointer=None):
+    """
+    Graph banata hai aur COMPILE kar ke return karta hai.
+    checkpointer=None  -> interactive mode: approval console par input() se (purane scripts/tests).
+    checkpointer diya  -> WORKER mode: graph approval_step se PEHLE ruk jata hai (interrupt_before), state
+                          checkpointer me save hoti hai, aur faisla DB se aa kar graph resume hota hai.
+    """
     graph = StateGraph(AgentState)
+    approval_fn = external_approval_node if checkpointer is not None else approval_node 
 
     # ---- Nodes (har node log_node() se wrap) - naam state field se alag rakhe ("_step" suffix) ----
     # Har node: log_node (time/log) ke andar track (status + DB sync). Status yahin se dikhta hai.
@@ -71,7 +88,10 @@ def build_graph():
     graph.add_node("diagnosis_step", log_node("diagnosis", track(diagnosis_node, before="investigating")))
     graph.add_node("critic_step", log_node("critic", track(critic_node)))
     graph.add_node("solution_step", log_node("solution", track(solution_node)))
-    graph.add_node("approval_step", log_node("approval", track(approval_node, before="awaiting_approval")))
+    # policy "human" kahe to status awaiting_approval wahin set hota hai (graph approval se pehle ruk bhi sakta hai)
+    graph.add_node("policy_step", log_node("policy", track(
+        policy_node, after=lambda update: "awaiting_approval" if update.get("policy_decision") == "human" else None)))
+    graph.add_node("approval_step", log_node("approval", track(approval_fn)))
     graph.add_node("executor_step", log_node("executor", track(executor_node, before="executing")))
     graph.add_node("verify_step", log_node("verify", track(verify_node, before="verifying")))
     graph.add_node("reporter_step", log_node("reporter", track(reporter_node, after="resolved")))
@@ -88,7 +108,9 @@ def build_graph():
     graph.add_conditional_edges("critic_step", _route_after_critic,
                                 ["solution_step", "diagnosis_step", "rejected_step"])
     graph.add_conditional_edges("solution_step", _route_after_solution,
-                                ["approval_step", "rejected_step"])
+                                ["policy_step", "rejected_step"])
+    graph.add_conditional_edges("policy_step", _route_after_policy,
+                                ["approval_step", "executor_step", "rejected_step"])
     graph.add_conditional_edges("approval_step", _route_after_approval,
                                 ["executor_step", "rejected_step"])
     graph.add_conditional_edges("executor_step", _route_after_executor,
@@ -99,7 +121,9 @@ def build_graph():
     graph.add_edge("reporter_step", END)
     graph.add_edge("rejected_step", END)
 
-    return graph.compile()
+    if checkpointer is None:
+        return graph.compile()                                       # Interactive mode
+    return graph.compile(checkpointer=checkpointer, interrupt_before=["approval_step"])   # Worker mode: approval se pehle ruko
 
 
 compiled_graph = build_graph()
