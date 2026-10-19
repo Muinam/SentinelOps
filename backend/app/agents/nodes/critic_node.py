@@ -1,3 +1,12 @@
+# critic_node.py
+#
+# Graph ka CRITIC node (Reflection / Self-Critique). Diagnosis ko approval tak pahunchne se
+# PEHLE check karta hai ke wo evidence se sabit hoti hai ya LLM ne baat banayi hai.
+# Do layer:
+#   1) Deterministic check (sasta): evidence ke quotes sach me status/logs/tool outputs me hain?
+#   2) LLM-as-judge (semantic): kya root cause evidence se SABIT hota hai?
+# Critic fail ho to SAFE side par jaate hain (insaan ke paas bhejo) - fail-closed.
+
 import json                                                       # json - status ko text me badalne ke liye
 import re                                                          # re - text normalize karne ke liye
 from app.agents.state import AgentState                           # State ka shape

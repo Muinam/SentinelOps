@@ -1,3 +1,10 @@
+# structured.py
+#
+# Is file ka kaam: LLM se STRUCTURED (JSON) jawab lena aur usko VALIDATE karna.
+# Tareeqa: schema do -> JSON maango -> Pydantic se check karo -> galat ho to
+# LLM ko uski ghalti dikha kar dobara maango (repair loop).
+# Ye kisi bhi model par chalta hai - provider ke special "JSON mode" par depend nahi.
+
 import json                                           # json - schema ko text me badalne aur jawab parse karne ke liye
 import re                                              # re - jawab me se JSON hissa nikalne ke liye
 from typing import TypeVar                             # TypeVar - function ko batata hai "jo model do, wahi wapas milega"

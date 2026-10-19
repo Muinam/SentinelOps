@@ -1,4 +1,11 @@
-from typing import TypedDict
+# state.py
+#
+# Is file ka kaam: AGENT STATE ka SHAPE define karna.
+# State ek "shared notebook" hai jo graph ke har node ke beech pass hota hai -
+# har node isme kuch PADH sakta hai aur kuch LIKH sakta hai.
+
+from typing import TypedDict                    # TypedDict - dictionary ka "type-safe" version
+
 
 class AgentState(TypedDict):
     """
@@ -31,8 +38,15 @@ class AgentState(TypedDict):
     solution: str                 # Solution ki wazahat
     recommended_action: str       # "restart_container" ya "manual_intervention"
 
-    # ---- approval_node ----
-    approved: bool                # Insaan ne haan/na kaha
+    # ---- policy_node (Day 9-11) ----
+    policy_decision: str          # "blocked" / "auto" / "human"
+
+    # ---- approval (console approval_node, ya external faisla jo worker DB se bharta hai) ----
+    approved: bool                # Insaan (ya policy) ne haan/na kaha
+    approval_decided: bool        # Kya kisi ne faisla kar diya? (False = abhi intezar)
+    approval_decision: str        # "approved" / "rejected" (sirf auto-policy ke liye bharta hai)
+    approved_by: str              # Kis ne faisla kiya
+    approval_note: str            # Faisle ke sath note
 
     # ---- executor_node aur verify_node ----
     execution_success: bool       # Restart (aur verify) kamyab hua?

@@ -1,51 +1,57 @@
-import asyncio
-import json
-import sys
-import os
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+# client.py
+#
+# Ye hamara MCP CLIENT hai. Ye server.py ko ek SUBPROCESS ki tarah start
+# karta hai aur uske sath standard MCP protocol (stdin/stdout ke through
+# JSON messages) me baat karta hai.
+#
+# NOTE: MCP library "async" hai (asyncio). Humne isko "sync wrapper"
+# functions me wrap kiya hai, taake baaki project (jo sync hai) easily use kar sake.
+
+import asyncio                                        # Python ka async/await support
+import json                                             # json - tool result text ko dict me badalne ke liye
+import sys                                              # sys.executable - CURRENT Python interpreter ka exact path
+import os                                                # os - working directory path nikalne ke liye
+from mcp import ClientSession, StdioServerParameters    # MCP client ke core classes
+from mcp.client.stdio import stdio_client                 # stdio (terminal pipe) se connect karne ka helper
 
 # "backend" folder ka absolute path - taake subprocess hamesha sahi jagah se chale
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# ---- Server ko kaise START karna hai ----
+# "python" ki jagah sys.executable: hamesha EXACT wahi Python (isi venv ka) use hoga
 _server_params = StdioServerParameters(
     command=sys.executable,
-    args=['-m', 'app.mcp.server'],
+    args=["-m", "app.mcp.server"],
     cwd=_BACKEND_DIR,
 )
 
-async def _list_tool_async():
-    """
-    ASYNC function - server se "available tools" ki list maangta hai.
-    """
+
+async def _list_tools_async() -> list:
+    """ASYNC - server se available tools ki list maangta hai."""
+    async with stdio_client(_server_params) as (read, write):    # Server subprocess start + pipes
+        async with ClientSession(read, write) as session:          # MCP conversation session
+            await session.initialize()                               # HANDSHAKE - ye step zaroori hai
+            result = await session.list_tools()                       # Tools poocho
+            return result.tools                                         # Sirf tools ki list
+
+
+async def _call_tool_async(tool_name: str, arguments: dict):
+    """ASYNC - ek tool ko arguments ke sath call karta hai."""
     async with stdio_client(_server_params) as (read, write):
-        async with ClientSession(read,write) as session:
-            await session.initialize()
-            result = await session.list_tools()
-            return result
-
-async def _call_tool_async(tool_name:str, arguments:dict) -> dict:
-    async with stdio_client(_server_params) as (read, write):
-        async with ClientSession(read,write) as session:
-            await session.initialize()
-            result = await session.call_tool(tool_name, arguments)
-            return result
+        async with ClientSession(read, write) as session:
+            await session.initialize()                               # HANDSHAKE
+            return await session.call_tool(tool_name, arguments)       # Tool call + result
 
 
-# ---- STEP 2: SYNC wrapper functions - baaki project (sync) ke liye easy interface ----
-def list_mcp_tools():
-    """
-    SYNC version - poore project me isko normal function ki tarah call kar sakte hain,
-    "async/await" ki zaroorat nahi padegi.
-    """
-    return asyncio.run(_list_tool_async())
+# ---- SYNC wrappers - baaki project ke liye easy interface ----
+def list_mcp_tools() -> list:
+    """SYNC version - normal function ki tarah call karo."""
+    return asyncio.run(_list_tools_async())
 
 
-def call_mcp_tool(tool_name:str, arguments:dict) -> dict:
-    """
-    SYNC version - MCP tool ko call karne ka simple interface.
-    """
-    return asyncio.run(_call_tool_async(tool_name, arguments)) 
+def call_mcp_tool(tool_name: str, arguments: dict):
+    """SYNC version - raw MCP result object return karta hai."""
+    return asyncio.run(_call_tool_async(tool_name, arguments))
 
 
 def call_mcp_tool_json(tool_name: str, arguments: dict) -> dict:

@@ -1,6 +1,9 @@
-# Ye string LLM ko batati hai ke uska ROLE kya hai aur usko kaise react karna hai
+# diagnosis_prompt.py
+# Prompts ko code se ALAG rakhna best practice hai - is se prompt tweak karne ke liye
+# code ke andar jaana nahi parta, aur prompts easily version-control/test ho sakte hain
 
-DIAGNOSIS_SYSTEM_PROMPT="""
+# Ye string LLM ko batati hai ke uska ROLE kya hai aur usko kaise react karna hai
+DIAGNOSIS_SYSTEM_PROMPT = """
 Aap ek Senior Site Reliability Engineer (SRE) agent hain jiska naam SentinelOps hai.
 
 Aapka kaam:
@@ -16,3 +19,4 @@ Response hamesha is format me dein:
 Agar aapko error diagnose karne ke liye system ka current status pata karna ho,
 to "check_system_status" tool ko zaroor call karein - guess mat karein.
 """
+# ^ Triple-quote string - multi-line text ko clean tareeqe se store karta hai

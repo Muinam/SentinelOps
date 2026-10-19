@@ -1,3 +1,11 @@
+# logging.py
+#
+# Is file ka kaam: OBSERVABILITY - har agent node ka kaam record karna:
+# kaunsa node chala, kitni der laga, kaunse state fields update hue, fail hua to kyun.
+# Ye "debugging agentic workflows" ki bunyadi skill hai.
+#
+# Logs 2 jagah jaate hain: terminal (dikhane ke liye) aur logs/agent.log file (record ke liye).
+
 import os                                       # os - logs folder banane ke liye
 import time                                      # time - node ka execution time napne ke liye
 import logging                                    # Python ka built-in logging module

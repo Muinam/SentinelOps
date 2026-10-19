@@ -1,3 +1,12 @@
+# investigation_tools.py
+#
+# Is file ka kaam: ReAct investigation ke liye LLM ko dene wale TOOLS banana.
+# GUARDRAILS (jaan-boojh kar):
+#   1) Sirf READ-ONLY tools - restart jaisa koi write action yahan nahi hai.
+#   2) container_name FIXED hai (incident wala container). LLM tool ke arguments me
+#      koi aur naam likhe to wo IGNORE hota hai - isse LLM doosre containers ko nahi dekh sakta
+#      (logs me chhupi "prompt injection" se bhi bachav hota hai).
+
 from app.mcp.client import call_mcp_tool_json         # MCP ke through Docker se baat karne ka helper
 from app.tools.rag_tool import search_similar_incidents  # RAG memory search
 

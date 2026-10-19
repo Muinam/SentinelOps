@@ -1,26 +1,27 @@
-from app.db.database import SessionLocal
-from app.db.crud import create_incident  # Database function jo record save karta hai
+# db_tool.py
+#
+# Is file ka kaam: crud.py ke create_incident() ko LLM tool ki shakal dena
 
-def log_incident(error_message:str, diagnosis:str, severity:str) -> dict:
+from app.db.database import SessionLocal            # Session banane ka factory (Day 2 shaam)
+from app.db.crud import create_incident               # Database function jo record save karta hai
+
+
+def log_incident(error_message: str, diagnosis: str, severity: str) -> dict:
     """
     YE FUNCTION LLM call karega jab uska diagnosis complete ho jaye,
     taake record permanently Postgres me store ho jaye (audit trail).
     """
-    
-    db = SessionLocal() # all diagnosis complete hona ka db ma save ho ga
+    db = SessionLocal()                                 # Naya DB session banao
     try:
-        incident = create_incident(
+        incident = create_incident(                       # crud.py wala function call karo
             db=db,
             error_message=error_message,
             diagnosis=diagnosis,
-            severity=severity
+            severity=severity,
         )
-        return { 
-            "status": "logged",
-            "incident_id": incident.id # Success response LLM ko
-        }
+        return {"status": "logged", "incident_id": incident.id}  # Success response LLM ko
     finally:
-        db.close()    # Session hamesha band karo, chahe error aaye
+        db.close()                                            # Session hamesha band karo, chahe error aaye
 
 
 # ---- Tool ka SCHEMA (Groq/OpenAI-style) ----

@@ -1,3 +1,9 @@
+# notify_tool.py
+#
+# Is file ka kaam: insaan ko BATANA - "approval chahiye", "resolve ho gaya", "insaan dekhe".
+# Channels: console (hamesha), telegram ya slack (.env se, dono free). Sirf built-in urllib use
+# hota hai (koi nayi dependency nahi). Notification fail ho to KABHI crash nahi karta (best-effort).
+
 import json                                                    # json - payload banane aur incident ka evidence padhne ke liye
 import urllib.request                                          # urllib - HTTP POST ke liye (built-in)
 from app.config import get_settings                            # .env ki settings

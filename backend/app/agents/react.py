@@ -1,3 +1,9 @@
+# react.py
+#
+# Is file ka kaam: ReAct pattern (Reason + Act) ka loop chalana.
+# LLM sochta hai -> koi tool chunta hai -> hum tool chalate hain -> nateeja (observation)
+# LLM ko wapas dete hain -> LLM phir sochta hai ... jab tak wo bina tool ke jawab na de.
+
 import json                                           # json - tool arguments parse karne aur observation banane ke liye
 from app.llm.client import call_llm                   # Hamara LLM wrapper
 

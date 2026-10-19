@@ -1,12 +1,18 @@
+# reporter_node.py
+#
+# Graph ka AAKHRI node (kamyab raasta). Ab ye:
+#   1) Incident pehle se intake_node ne khola hua hai - status "resolved" wrapper (core/lifecycle.py)
+#      likhta hai, to yahan naya row NAHI banta (pehle log_incident duplicate row banata tha).
+#   2) Incident ko FAISS memory me add karta hai (semantic memory) - CONTINUOUS INGESTION.
+# FALLBACK: agar intake ke waqt DB kharab tha (incident_id None), to purana tareeqa (log_incident)
+# try karta hai; wo bhi fail ho to crash nahi karta.
+
 from app.agents.state import AgentState
-from app.tools.db_tool import log_incident
-from app.tools.rag_tool import remember_incident
+from app.tools.db_tool import log_incident                  # Purana tareeqa - sirf fallback ke liye
+from app.tools.rag_tool import remember_incident             # FAISS memory me add + disk save
+
 
 def reporter_node(state: AgentState) -> AgentState:
-    """
-    Poore graph ka data (diagnosis, severity) database me save karta hai.
-    Ye graph ka aakhri step hai - is ke baad koi node nahi chalega (END).
-    """
     print("[NODE] reporter_node running...")
 
     incident_id = state.get("incident_id")                    # Intake ne jo ID di thi

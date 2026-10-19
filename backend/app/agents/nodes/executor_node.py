@@ -1,5 +1,12 @@
+# executor_node.py
+#
+# Graph ka ACTION node. Sirf tab chalta hai jab insaan ne approve kar diya ho AUR action
+# "restart_container" ho (graph ki routing ye pakki karti hai). MCP ke through container
+# RESTART karta hai - guardrail docker_tool.py me hai.
+
 from app.agents.state import AgentState
-from app.mcp.client import call_mcp_tool_json
+from app.mcp.client import call_mcp_tool_json          # MCP client ka JSON helper
+
 
 def executor_node(state: AgentState) -> AgentState:
     """
@@ -25,4 +32,3 @@ def executor_node(state: AgentState) -> AgentState:
         "reflection_count": 0,                             # Naye cycle me critic ko dobara mauqa mile
         "review_reason": f"Restart failed: {result.get('error')}",
     }
-

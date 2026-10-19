@@ -1,28 +1,31 @@
-from sqlalchemy.orm import Session
-from app.db.models import Incident, IncidentEvent
+# crud.py
+#
+# CRUD = Create, Read, Update, Delete
+# Abhi Day 2 ke liye sirf Create aur Read chahiye - Update/Delete baad me aayenge
+
+from sqlalchemy.orm import Session                 # Type hint ke liye - session ka type
+from app.db.models import Incident, IncidentEvent   # Humare table models (Incident Day 2, IncidentEvent Day 8)
 
 
-def create_incident(db:Session, error_message:str, diagnosis:str, severity:str) -> Incident:
+def create_incident(db: Session, error_message: str, diagnosis: str, severity: str) -> Incident:
     """
     Ek NAYA incident record Postgres me save karta hai.
     """
-    incident = Incident(
-        error_message=error_message,
-        diagnosis=diagnosis,
-        severity=severity
+    incident = Incident(                              # Naya Python object banao (abhi DB me nahi gaya)
+        error_message=error_message,                    # Original error text
+        diagnosis=diagnosis,                              # LLM ka diagnosis
+        severity=severity,                                 # Severity level
     )
-
     db.add(incident)                                     # Session ko batao "ye record add karna hai"
     db.commit()                                           # Ab ACTUAL DB me save (permanent) karo
     db.refresh(incident)                                  # DB se latest data wapas object me le aao (jaise auto id)
     return incident                                        # Saved incident (with its new ID) return karo
 
 
-def get_recent_incidents(db: Session, limit: int=5) -> list[Incident]:
+def get_recent_incidents(db: Session, limit: int = 5) -> list[Incident]:
     """
     Sab se RECENT incidents nikalta hai (naye se purane order me).
     """
-
     return (
         db.query(Incident)                                # Incident table pe query shuru
         .order_by(Incident.created_at.desc())               # Sab se naye pehle
@@ -30,18 +33,24 @@ def get_recent_incidents(db: Session, limit: int=5) -> list[Incident]:
         .all()                                                  # Query chalao, sab results list me lo
     )
 
-def get_all_incidents(db:Session) -> list[Incident]:
+
+def get_all_incidents(db: Session) -> list[Incident]:
     """
     Day 6 NAYA: Postgres ke SAARE incidents (purane se naye order me) nikalta hai.
     RAG backfill ke liye use hota hai - Postgres ki history ko FAISS memory me daalne ke liye.
     """
     return (
-        db.query(Incident)
-        .order_by(Incident.created_at.asc())
-        .all()
+        db.query(Incident)                       # Incident table pe query
+        .order_by(Incident.created_at.asc())       # Purane pehle (asc = ascending)
+        .all()                                      # Sab records list me
     )
 
+
+# ======================================================================
 # Day 8 NAYA: Incident LIFECYCLE ke functions
+# ======================================================================
+
+# Sirf yehi columns update ho sakte hain - koi bhi attribute likhne ki ijazat nahi (safety)
 UPDATABLE_FIELDS = {
     "status", "diagnosis", "severity", "solution", "recommended_action", "confidence",
     "retry_count", "review_reason", "resolved_at", "container_name",

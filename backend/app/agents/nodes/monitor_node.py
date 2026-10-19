@@ -1,14 +1,20 @@
+# monitor_node.py
+#
+# Graph ka PEHLA node. Day 6 se ye REAL Docker data leta hai, MCP protocol ke through
+# (pehle fake/dummy data tha). LLM yahan bhi use nahi hota - deterministic node hai.
+
 from app.agents.state import AgentState
-from app.mcp.client import call_mcp_tool_json
+from app.mcp.client import call_mcp_tool_json          # MCP client ka JSON helper (Day 6)
+
 
 def monitor_node(state: AgentState) -> AgentState:
     """
     Container ka LIVE status aur RECENT logs MCP server se maangta hai,
     aur dono ko state["system_status"] me daal deta hai (diagnosis ke liye).
     """
-    print("[NODE] monitor_node running...")        # Debug ke liye - konsa node chal raha hai dikhane ke liye
+    print("[NODE] monitor_node running...")
 
-    container = state.get("container_name","")
+    container = state.get("container_name", "")           # Kis container ko monitor karna hai
 
     # ---- MCP call 1: status (server alag process me chalta hai, protocol se baat hoti hai) ----
     status = call_mcp_tool_json("docker_check_status", {"container_name": container})
@@ -20,4 +26,4 @@ def monitor_node(state: AgentState) -> AgentState:
     # Logs lambe ho sakte hain - sirf aakhri 1500 characters rakho (LLM prompt chhota rahe)
     status["recent_logs"] = logs_text[-1500:]
 
-    return {"system_status": status} 
+    return {"system_status": status}                          # State me save karo

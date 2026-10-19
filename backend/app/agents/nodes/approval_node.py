@@ -1,4 +1,14 @@
+# approval_node.py
+#
+# Graph ka SAFETY node (Human-in-the-loop). Agent khud se risky action nahi karta -
+# pehle INSAAN se confirm lena hoga. Ab insaan ko poori tasveer dikhti hai: diagnosis,
+# evidence, confidence, critic ka faisla aur wo ACTION jo asal me chalega.
+#
+# NOTE: Abhi console input() se approval leta hai. Production me ye pause/resume + API
+# se hoga (agle steps me).
+
 from app.agents.state import AgentState
+
 
 def approval_node(state: AgentState) -> AgentState:
     """Insaan ko poori information dikhata hai aur HAAN/NA poochta hai."""

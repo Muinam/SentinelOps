@@ -1,89 +1,102 @@
-from app.llm import client
-import docker
+# docker_tool.py
+#
+# Is file ka kaam: REAL Docker containers se baat karna.
+# IMPORTANT: Abhi sirf READ-ONLY operations hain (status check, logs) -
+# koi restart/stop/kill nahi - wo zyada risky hain, baad ke din me
+# guardrails ke sath add karenge.
 
-_client = None
+import docker                                    # Docker Python SDK
+
+_client = None                                     # Module-level client - ek hi dafa banega
+
 
 def _get_client():
     """
     Docker client ko LAZILY banata hai (jab pehli baar zaroorat ho) aur reuse karta hai.
     Docker Desktop (Windows/Mac) ya Docker daemon (Linux) chalta hona chahiye.
     """
-    global _client
-    if _client is None:
-        _client = docker.from_env()
+    global _client                                 # global keyword - module-level variable update karne ke liye
+    if _client is None:                              # Agar abhi tak nahi bana
+        _client = docker.from_env()                    # Local Docker daemon se connect karo
     return _client
 
-def check_container_status(container_name:str) -> dict:
+
+def check_container_status(container_name: str) -> dict:
     """
     Ek container ka LIVE status, image, aur basic info nikalta hai.
     """
-
     try:
-        client = _get_client()
-        container = client.containers.get(container_name)
+        client = _get_client()                         # Docker client lo
+        container = client.containers.get(container_name)  # Naam se container dhoondo
 
-        return{
-            'name':container.name,
-            'status':container.status,
-            'image': str(container.image.tags)
+        return {
+            "name": container.name,                       # Container ka naam
+            "status": container.status,                     # "running" / "exited" / "paused" waghera
+            "image": str(container.image.tags),               # Kaunsi image se bana hai
         }
 
+    except docker.errors.NotFound:                       # Agar container exist hi nahi karta
+        return {"error": f"Container '{container_name}' not found"}
 
-    except docker.errors.NotFound:
-        return {"error": f"Container {container_name} not found"}
-
-    except Exception as e:
-        return {"error": f"Docker Error: {str(e)}"}
+    except Exception as e:                                 # Koi aur error (Docker na chal raha ho waghera)
+        return {"error": f"Docker error: {str(e)}"}
 
 
-def read_container_logs(container_name:str, tail: int=50) -> dict:
+def read_container_logs(container_name: str, tail: int = 50) -> dict:
     """
     Container ke RECENT logs padhta hai - diagnosis ke liye bohat useful.
     tail = kitni recent lines chahiye (default 50)
     """
-
-    try: 
+    try:
         client = _get_client()
         container = client.containers.get(container_name)
-        
+
         # container.logs() bytes return karta hai, isliye decode karna padta hai text me
-        raw_logs = container.logs(tail=tail)
-        logs_text = raw_logs.decode('utf-8', errors='replace')
-        
-        return{'container': container_name, 'logs': logs_text}
+        raw_logs = container.logs(tail=tail)                  # Last N lines fetch karo
+        logs_text = raw_logs.decode("utf-8", errors="replace")   # Bytes -> readable text
+
+        return {"container": container_name, "logs": logs_text}
 
     except docker.errors.NotFound:
-        return {'error': f'Container {container_name} not found'}
+        return {"error": f"Container '{container_name}' not found"}
 
     except Exception as e:
-        return {'error': f'Docker Error: {str(e)}'}
+        return {"error": f"Docker error: {str(e)}"}
 
 
+# ======================================================================
+# Day 6 NAYA: WRITE action + GUARDRAIL
+# ======================================================================
+
+# GUARDRAIL: in naamon wale containers ko agent KABHI restart nahi kar sakta.
+# Ye HARD-CODED rule hai - LLM kitna bhi convince kare, ye code check pehle chalega.
+# (Databases/cache restart karne se data loss ya poora system down ho sakta hai)
 PROTECTED_KEYWORDS = ("postgres", "redis", "mysql", "mongo", "database")
 
 
-def restart_container(container_name:str, timeout: int=10)->dict:
+def restart_container(container_name: str, timeout: int = 10) -> dict:
     """
     Container ko RESTART karta hai - ye WRITE (risky) action hai.
     IMPORTANT: Is function ko call karne se PEHLE graph me human approval ho chuki hoti hai.
     """
-    lowered = container_name.lower()
-
+    # ---- GUARDRAIL CHECK: protected container hai to seedha mana kar do ----
+    lowered = container_name.lower()                           # Case-insensitive match ke liye
     for keyword in PROTECTED_KEYWORDS:
-        if keyword in lowered:
-            return {'error': f'Restarting protected container {container_name} is not allowed'}
-    
+        if keyword in lowered:                                    # Naam me protected keyword mila
+            return {
+                "restarted": False,
+                "error": f"GUARDRAIL: '{container_name}' protected container hai - restart allowed nahi",
+            }
+
     try:
         client = _get_client()
-        container = client.containers.get(container_name)
-        container.restart(timeout=timeout)
-        container.reload()
+        container = client.containers.get(container_name)          # Container dhoondo
+        container.restart(timeout=timeout)                            # ACTUAL restart (timeout sec tak graceful stop ka wait)
+        container.reload()                                             # Latest status docker se dobara fetch karo
+        return {"restarted": True, "name": container.name, "status": container.status}
 
-        return {'restarted': True, 'name': container_name, 'status':container.status, }
-    
     except docker.errors.NotFound:
         return {"restarted": False, "error": f"Container '{container_name}' not found"}
-    
     except Exception as e:
         return {"restarted": False, "error": f"Docker error: {str(e)}"}
 

@@ -1,4 +1,11 @@
+# rejected_node.py
+#
+# Wo jagah jahan incident "insaan ke paas" jata hai - automatic raasta khatam.
+# Wajah kai ho sakti hain (critic ne reject kiya, koi fault nahi mila, manual kaam chahiye,
+# insaan ne mana kiya, restart ya verify fail). Wajah state["review_reason"] me hoti hai.
+
 from app.agents.state import AgentState
+
 
 def rejected_node(state: AgentState) -> AgentState:
     """Incident ko manual review ke liye mark karta hai aur wajah dikhata hai."""

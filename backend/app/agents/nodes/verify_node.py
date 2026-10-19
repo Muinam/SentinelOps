@@ -1,3 +1,9 @@
+# verify_node.py
+#
+# Graph ka VERIFY node (Reflection ka doosra hissa). Restart ke baad container ko kai
+# baar check karta hai ke wo sach me healthy hai. "Restart command chali" aur
+# "masla theek hua" do alag cheezein hain - ye node doosri wali sabit karta hai.
+
 import time                                              # time - checks ke beech intezar ke liye
 from app.agents.state import AgentState                   # State ka shape
 from app.mcp.client import call_mcp_tool_json             # MCP se container ka status lene ke liye

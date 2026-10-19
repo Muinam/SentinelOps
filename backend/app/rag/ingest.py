@@ -1,3 +1,13 @@
+# ingest.py
+#
+# Is file ka kaam: INGESTION - Postgres me jo REAL incidents save hain, unko
+# FAISS memory me daalna. Ye Postgres (structured memory) aur FAISS (semantic memory)
+# ko CONNECT karta hai - pehle ye dono alag alag the.
+#
+# Run karne ka tareeqa (ek dafa, ya jab memory khali ho):
+#   cd backend
+#   python -m app.rag.ingest
+
 from app.db.database import SessionLocal            # DB session factory
 from app.db.crud import get_all_incidents             # Day 6 ka naya CRUD function
 from app.tools.rag_tool import remember_incident, memory_size  # Memory me add + disk save

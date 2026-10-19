@@ -1,3 +1,14 @@
+# migrate.py
+#
+# Is file ka kaam: database ko models.py ke mutabiq banana - PURANI DATA ko chhede bina.
+#   1) Jo tables maujood nahi (jaise incident_events) wo bana deta hai
+#   2) Maujooda tables me jo columns missing hain wo ALTER TABLE se jod deta hai
+# SQLAlchemy ka create_all purani table me naye columns NAHI jodta - isliye ye file zaroori hai.
+# Dobara chalane par kuch nahi badalta (idempotent). Professional teams iske liye Alembic use karti hain.
+#
+# Run karne ka tareeqa (ek dafa, backend folder se):
+#   python -m app.db.migrate
+
 from sqlalchemy import inspect, text                    # inspect - maujooda columns dekhne ke liye, text - raw SQL
 from app.db.database import engine as default_engine, Base   # Hamara engine aur models ki base
 import app.db.models                                      # Models import karna zaroori hai (tables register hon)

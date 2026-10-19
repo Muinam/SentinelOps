@@ -185,12 +185,13 @@ def answers(*items):
     builtins.input = fake_input
 
 
-def run(*inputs, limit=None):
+def run(*inputs, limit=None, container="web-1"):
     """Graph chalata hai; (final_state, nodes_ka_order) return karta hai."""
     answers(*inputs)
     buffer = io.StringIO()                                                  # Print ko pakadne ke liye
+    state = {"error_message": f"{container} keeps crashing", "container_name": container}
     with contextlib.redirect_stdout(buffer):
-        final = compiled_graph.invoke(base_state(), {"recursion_limit": limit or RECURSION_LIMIT})
+        final = compiled_graph.invoke(state, {"recursion_limit": limit or RECURSION_LIMIT})
     nodes = [line.split()[1].replace("_node", "") for line in buffer.getvalue().splitlines() if line.startswith("[NODE]")]
     return final, nodes
 
@@ -277,15 +278,15 @@ print("\n[4] Graph ke raaste")
 fake.reset([GOOD], [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS)
 before = rag_tool.memory_size()
 final, nodes = run("y")
-assert nodes == ["monitor", "diagnosis", "critic", "solution", "approval", "executor", "verify", "reporter"], nodes
+assert nodes == ["intake", "monitor", "diagnosis", "critic", "solution", "policy", "approval", "executor", "verify", "reporter"], nodes
 assert final["verified"] and final["incident_id"] is not None and rag_tool.memory_size() == before + 1
 assert final["severity"] == "High" and final["diagnosis_evidence"] and len(final["react_trace"]) == 1
-ok("G1 poora raasta: monitor>diagnosis>critic>solution>approval>executor>verify>reporter, DB+FAISS me save")
+ok("G1 poora raasta: intake>monitor>diagnosis>critic>solution>policy>approval>executor>verify>reporter, DB+FAISS me save")
 
 # ---- G2: reflection - pehli diagnosis hallucinated, critic wapas bheje, doosri theek ----
 fake.reset([HALLUCINATED, GOOD], [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS)
 final, nodes = run("y")
-assert nodes[:5] == ["monitor", "diagnosis", "critic", "diagnosis", "critic"], nodes
+assert nodes[:6] == ["intake", "monitor", "diagnosis", "critic", "diagnosis", "critic"], nodes
 second_prompt = [m for kind, m in fake.calls if kind == "diag"][1][-1]["content"]
 assert "REVIEWER REJECTED" in second_prompt and "NOT found" in second_prompt
 assert final["verified"]
@@ -294,8 +295,8 @@ ok("G2 reflection: hallucinated diagnosis pakdi gayi, hidayat ke sath dobara dia
 # ---- G3: hamesha hallucinated - limit ke baad insaan ----
 fake.reset([HALLUCINATED], [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS)
 final, nodes = run()
-assert nodes == ["monitor", "diagnosis", "critic", "diagnosis", "critic", "rejected"], nodes
-assert fake.restart_calls == 0 and final.get("incident_id") is None
+assert nodes == ["intake", "monitor", "diagnosis", "critic", "diagnosis", "critic", "rejected"], nodes
+assert fake.restart_calls == 0  # intake_node har case me incident_id set karta hai, isliye None nahi hoga
 assert final["review_reason"].startswith("Diagnosis not supported by evidence")
 assert not [1 for kind, _ in fake.calls if kind == "critic"]
 ok("G3 hamesha hallucinated: 2 koshish ke baad rejected, restart nahi hua, critic LLM tak baat gayi hi nahi (sasta check ne rok diya)")
@@ -303,14 +304,14 @@ ok("G3 hamesha hallucinated: 2 koshish ke baad rejected, restart nahi hua, criti
 # ---- G4: koi fault nahi (nginx wala asal scenario) ----
 fake.reset([NO_FAULT], [CRITIC_OK], [SOL_RESTART], logs=INFO_LOGS)
 final, nodes = run()
-assert nodes == ["monitor", "diagnosis", "critic", "rejected"], nodes
+assert nodes == ["intake", "monitor", "diagnosis", "critic", "rejected"], nodes
 assert final["review_reason"].startswith("No fault found") and fake.restart_calls == 0
 ok("G4 container theek hai, user ka dawa jhoota: 'No fault found', koi action nahi")
 
 # ---- G5: manual intervention ----
 fake.reset([GOOD], [CRITIC_OK], [SOL_MANUAL], logs=ERR_LOGS)
 final, nodes = run()
-assert nodes == ["monitor", "diagnosis", "critic", "solution", "rejected"], nodes
+assert nodes == ["intake", "monitor", "diagnosis", "critic", "solution", "rejected"], nodes
 assert fake.input_calls == 0 and fake.restart_calls == 0
 assert final["review_reason"].startswith("Manual intervention needed")
 ok("G5 restart ilaaj nahi: approval poocha hi nahi, seedha insaan")
@@ -318,15 +319,15 @@ ok("G5 restart ilaaj nahi: approval poocha hi nahi, seedha insaan")
 # ---- G6: insaan ne na kaha ----
 fake.reset([GOOD], [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS)
 final, nodes = run("n")
-assert nodes[-2:] == ["approval", "rejected"] and fake.restart_calls == 0
+assert nodes[-2:] == ["approval", "rejected"] and fake.restart_calls == 0  # intake/policy already ran before approval
 assert final["review_reason"] == "A human rejected the proposed action."
 ok("G6 insaan ne 'no' kaha: executor chala hi nahi")
 
 # ---- G7: restart kamyab lekin verify fail (container phir gir gaya) ----
 fake.reset([GOOD], [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS, verify=("restarting",))
-final, nodes = run("y", "y", "y")
+final, nodes = run("y", "y", "y", container="web-g7")
 assert nodes.count("executor") == 3 and nodes.count("verify") == 3 and nodes[-1] == "rejected"
-assert final["retry_count"] == MAX_RETRIES + 1 and not final["verified"] and final.get("incident_id") is None
+assert final["retry_count"] == MAX_RETRIES + 1 and not final["verified"]  # intake_node ne incident_id set kiya hoga
 assert "did not become healthy" in final["review_reason"]
 ok("G7 restart ke baad container healthy nahi mila: 3 koshish ke baad rejected (pehle ise 'success' maan lete)")
 
@@ -335,12 +336,12 @@ def halluc_first(prompt):
     """Har naye cycle me pehli diagnosis hallucinated; critic ki hidayat milne par theek."""
     return GOOD if "REVIEWER REJECTED" in prompt else HALLUCINATED
 fake.reset(halluc_first, [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS, verify=("restarting",))
-final, nodes = run("y", "y", "y")
+final, nodes = run("y", "y", "y", container="web-g8")
 assert len(nodes) > 25, len(nodes)
 ok(f"G8 worst case me graph {len(nodes)} steps leta hai (LangGraph ki default limit 25 se zyada)")
 fake.reset(halluc_first, [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS, verify=("restarting",))
 try:
-    run("y", "y", "y", limit=25)
+    run("y", "y", "y", limit=25, container="web-g8b")
     raise SystemExit("FAIL: default limit par error aana chahiye tha")
 except Exception as error:
     assert type(error).__name__ == "GraphRecursionError", type(error).__name__
@@ -348,14 +349,14 @@ ok("G8b default limit (25) par GraphRecursionError aata - isliye RECURSION_LIMIT
 
 # ---- G9: LLM valid JSON hi na de ----
 fake.reset(["this is not json"], [CRITIC_OK], [SOL_RESTART], logs=ERR_LOGS)
-final, nodes = run()
+final, nodes = run(container="web-g9")
 assert nodes[-1] == "rejected" and fake.restart_calls == 0
 assert final["review_reason"].startswith("Diagnosis not supported by evidence")
 ok("G9 LLM kharab JSON de to graph crash nahi hota, insaan ke paas jata hai")
 
 # ---- G10: model tool-calling support na kare ----
 fake.reset([GOOD], [CRITIC_OK], [SOL_RESTART], react="error", logs=ERR_LOGS)
-final, nodes = run("y")
+final, nodes = run("y", container="web-g10")
 assert final["verified"] and final["react_trace"] == []
 ok("G10 ReAct fail (tool-calling nahi) to baseline data par diagnosis chalti hai, crash nahi")
 

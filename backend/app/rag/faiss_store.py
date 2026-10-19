@@ -1,19 +1,24 @@
-import os
-import json
-import faiss                                  # FAISS library - vector search engine
-import numpy as np                             # numpy - vectors arrays ke liye
-from app.rag.embeddings import get_embedding, EMBEDDING_DIM  # Hamara embedding function
+# faiss_store.py
+#
+# Is file ka kaam: FAISS index ko manage karna - vectors ADD karna, SEARCH karna,
+# aur ab (Day 6) DISK pe SAVE/LOAD karna taake memory restart ke baad bhi rahe.
+
+import os                                      # os - file/folder paths aur existence check ke liye
+import json                                    # json - original texts ko file me save/load karne ke liye
+import faiss                                   # FAISS library - vector search engine
+import numpy as np                              # numpy - vectors arrays ke liye
+from app.rag.embeddings import get_embedding, EMBEDDING_DIM  # Real embedding function (Day 6 ka)
 
 
 class FaissStore:
     """
-    Ye class FAISS index ke around ek clean wrapper hai.
-    Isse hum "incidents add karo" aur "similar incidents dhoondo" jaise simple methods use kar sakte hain,
-    bina FAISS ki low-level details har jagah likhe.
+    FAISS index ke around ek clean wrapper.
+    "incident add karo", "similar incidents dhoondo", "disk pe save/load karo" -
+    ye sab simple methods hain, FAISS ki low-level details har jagah nahi likhni padti.
     """
 
     def __init__(self):
-         # IndexFlatL2 - exact (brute-force) search, L2 (Euclidean) distance se
+        # IndexFlatL2 - exact (brute-force) search, L2 (Euclidean) distance se
         self.index = faiss.IndexFlatL2(EMBEDDING_DIM)
         # FAISS sirf vectors rakhta hai, ASLI TEXT nahi - isliye texts alag list me
         self.texts = []
@@ -21,47 +26,29 @@ class FaissStore:
     def add_incident(self, incident_text: str) -> None:
         """Ek naya incident text embed karke index me add karta hai."""
         vector = get_embedding(incident_text)                # Text -> vector (real model se)
-        vector_2d = np.asarray(vector, dtype="float32").reshape(1, -1)
-        if vector_2d.shape[1] != EMBEDDING_DIM:                 # Safety check - length galat ho to saaf error
-            raise ValueError(
-                f"Embedding ki length {vector_2d.shape[1]} hai, lekin {EMBEDDING_DIM} chahiye. "
-                f"embeddings.py ka model/EMBEDDING_DIM check karein."
-            )
+        vector_2d = np.array([vector], dtype="float32")        # FAISS ko 2D array chahiye: shape (1, 384)
         self.index.add(vector_2d)                               # Index me add karo
-        self.texts.append(incident_text)                        # Original text bhi save rakho
+        self.texts.append(incident_text)                         # Original text bhi save rakho
 
     def search(self, query_text: str, top_k: int = 3):
-        """
-        Query text se sab se zyada SIMILAR incidents dhoondta hai.
-        top_k = kitne results chahiye (default 3)
-        """
-        if self.index.ntotal == 0:                          # Agar index khali hai
-            return []                                         # to khali result return karo
+        """Query se sab se SIMILAR incidents dhoondta hai (distance kam = zyada similar)."""
+        if self.index.ntotal == 0:                              # Agar index khali hai
+            return []                                             # to khali result
 
-        query_vector = get_embedding(query_text)             # Query ko bhi vector me convert karo
-        query_2d = np.asarray(query_vector, dtype="float32").reshape(1, -1)
+        query_vector = get_embedding(query_text)                 # Query ko vector banao
+        query_2d = np.array([query_vector], dtype="float32")      # 2D shape
+        distances, indices = self.index.search(query_2d, top_k)    # FAISS search
 
-        # index.search() do cheezein return karta hai:
-        # distances - kitni "door" hai match (kam = zyada similar)
-        # indices - kaunse position par match mila
-        distances, indices = self.index.search(query_2d, top_k)
+        results = []
+        for rank, idx in enumerate(indices[0]):                   # indices[0] - pehli (aur wahid) query ke results
+            if idx == -1:                                           # -1 = match nahi mila (data kam hai)
+                continue
+            results.append({"text": self.texts[idx], "distance": float(distances[0][rank])})
+        return results
 
-        results = []                                           # Final results yahan collect karenge
-        for rank, idx in enumerate(indices[0]):                # indices[0] kyunki humne sirf 1 query bheji thi
-            if idx == -1:                                       # -1 ka matlab match nahi mila (kam data)
-                continue                                         # Isko skip karo
-            results.append(
-                {
-                    "text": self.texts[idx],                    # Original incident text
-                    "distance": float(distances[0][rank]),       # Kitna similar hai (kam = behtar)
-                }
-            )
-
-        return results                                           # List of matching incidents return karo
-
-
-# NAYA: Persistence (disk pe save / load)
-
+    # ------------------------------------------------------------------
+    # Day 6 NAYA: Persistence (disk pe save / load)
+    # ------------------------------------------------------------------
     def save(self, index_path: str) -> None:
         """
         Index + texts dono ko disk pe save karta hai.

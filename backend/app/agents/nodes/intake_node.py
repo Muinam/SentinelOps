@@ -1,3 +1,11 @@
+# intake_node.py
+#
+# Graph ka PEHLA node. Incident ka record SHURU me hi banata hai (pehle sirf aakhir me banta
+# tha, isliye rejected/failed raaste kuch save nahi karte the). Ab har incident ka record hota hai,
+# chahe wo resolve ho ya insaan ke paas jaye.
+# Agar state me incident_id pehle se ho (jaise baad me watcher/API pehle se bana kar de) to
+# naya nahi banata - wahi use karta hai.
+
 from app.agents.state import AgentState                    # State ka shape
 from app.db.incidents import open_incident                  # Best-effort incident kholne wala
 
