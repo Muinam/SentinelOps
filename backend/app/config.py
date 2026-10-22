@@ -1,7 +1,3 @@
-# config.py
-# Is file ka kaam: environment variables (.env file) ko ek clean Python object me load karna
-# Fayda: har jagah os.getenv() likhne ke bajaye, "settings.anthropic_api_key" jaisa clean access milta hai
-
 from pydantic_settings import BaseSettings   # BaseSettings - .env se auto values uthata hai
 from pydantic import Field                    # Field - default values aur validation ke liye
 from functools import lru_cache                # lru_cache - settings ko baar baar load hone se bachata hai
@@ -62,6 +58,23 @@ class Settings(BaseSettings):
     telegram_api_base: str = Field(default="https://api.telegram.org", description="Sirf testing ke liye badalte hain")
     slack_webhook_url: str = Field(default="", description="Slack incoming webhook URL (free)")
 
+    # ------------------------------------------------------------------
+    # Day 12 NAYE settings: API aur LLM router (sab ke default hain)
+    # ------------------------------------------------------------------
+
+    # ---- FastAPI (app/main.py) ----
+    # Is key ke bina API ke endpoints (health ke ilawa) kaam nahi karte (503). Lambi random value rakhein.
+    api_key: str = Field(default="", description="X-API-Key header ki value")
+    api_cors_origins: str = Field(default="", description="Frontend ke origins, comma se alag (khali = CORS band)")
+    api_host: str = Field(default="127.0.0.1", description="API kis address par sune (0.0.0.0 = bahar se bhi)")
+    api_port: int = Field(default=8000, description="API ka port")
+
+    # ---- LLM router (llm/client.py) ----
+    # Primary model fail ho (rate limit, model band) to in models par fallback - comma se alag (khali = sirf primary)
+    groq_fallback_models: str = Field(default="", description="Comma separated fallback model names")
+    llm_max_retries: int = Field(default=2, description="Ek model par rate limit/network error par kitni retries")
+    llm_backoff_seconds: float = Field(default=1.5, description="Pehli retry se pehle intezar, phir double hota jata hai")
+
     class Config:
         # Pydantic ko batata hai ke values ".env" naam ki file se uthani hain
         env_file = ".env"
@@ -75,4 +88,4 @@ def get_settings() -> Settings:
     Settings object ko lazily (jab zaroorat ho tab) banata hai aur cache karta hai.
     Poore app me hum isi function ko call karenge settings access karne ke liye.
     """
-    return Settings()  # .env file read kar ke Settings object return karta hai
+    return Settings()

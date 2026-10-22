@@ -13,3 +13,5 @@ numpy==1.26.4               # Numeric arrays - FAISS aur embeddings ke liye zaro
 python-dotenv==1.0.1        # .env file read karne ke liye
 pydantic==2.13.5            # Data validation aur settings management
 pydantic-settings==2.5.2    # BaseSettings class jo config.py me use hui
+fastapi==0.150.0 
+uvicorn==0.54.0

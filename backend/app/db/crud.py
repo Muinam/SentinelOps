@@ -209,3 +209,18 @@ def list_stale_awaiting(db: Session, older_than_minutes: int) -> list:
         .all()
     )
     return [row for row in rows if as_utc(row.updated_at or row.created_at) < cutoff]
+
+
+VALID_STATUSES = ("open",) + ACTIVE_STATUSES + FINISHED_STATUSES
+
+# API me jo status filter ke taur par maane jaate hain
+def list_incidents(db: Session, status: "str | None" = None, container_name: "str | None" = None,
+                   limit: int = 50, offset: int = 0) -> list:
+    """Incidents ki list, naye pehle. status / container se filter, limit aur offset se pages."""
+    query = db.query(Incident)
+    if status:                                                # Sirf is status ke
+        query = query.filter(Incident.status == status)
+    if container_name:                                         # Sirf is container ke
+        query = query.filter(Incident.container_name == container_name)
+    return query.order_by(Incident.id.desc()).offset(offset).limit(limit).all()
+

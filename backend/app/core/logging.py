@@ -1,11 +1,3 @@
-# logging.py
-#
-# Is file ka kaam: OBSERVABILITY - har agent node ka kaam record karna:
-# kaunsa node chala, kitni der laga, kaunse state fields update hue, fail hua to kyun.
-# Ye "debugging agentic workflows" ki bunyadi skill hai.
-#
-# Logs 2 jagah jaate hain: terminal (dikhane ke liye) aur logs/agent.log file (record ke liye).
-
 import os                                       # os - logs folder banane ke liye
 import time                                      # time - node ka execution time napne ke liye
 import logging                                    # Python ka built-in logging module
@@ -41,11 +33,22 @@ def log_node(node_name: str, node_func):
             update = node_func(state)                       # ASAL node chalao
             elapsed = time.time() - start                    # Kitna time laga
             keys = list(update.keys()) if isinstance(update, dict) else []
-            _logger.info(f"NODE={node_name} | OK | {elapsed:.2f}s | updated={keys}")
+            _logger.info(f"NODE={node_name} | incident=#{state.get('incident_id')} | OK | {elapsed:.2f}s | updated={keys}")
             return update                                     # Result bina badle aage bhejo
         except Exception as e:
             elapsed = time.time() - start
-            _logger.info(f"NODE={node_name} | FAILED | {elapsed:.2f}s | error={e}")
+            _logger.info(f"NODE={node_name} | incident=#{state.get('incident_id')} | FAILED | {elapsed:.2f}s | error={e}")
             raise                                              # Error ko dobara uthao - chhupana nahi hai
 
     return wrapper
+
+
+def log_event(text: str) -> None:
+    """
+    Node ke bahar ki cheezon (jaise LLM call ka model, latency, tokens) ko bhi usi logs/agent.log me likhta hai.
+    Logging fail ho to kabhi crash nahi karta.
+    """
+    try:
+        _logger.info(text)                                 # Ek line likho
+    except Exception:
+        pass                                                # Log likhna zaroori nahi, kaam nahi rukna chahiye
